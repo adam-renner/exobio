@@ -7,15 +7,20 @@ import axios from 'axios';
 const fetchApiSeed = async (): Promise<ApiSeedData> => {
     try {
         // Using a public API for a random fact to seed generation
-        const response = await axios.get('https://uselessfacts.jsph.pl/random.json?language=en');
+        const response = await axios.get('https://uselessfacts.jsph.pl/random.json');
         // Reformat the response
-        return {
-            id: response.data.id,
-            text: response.data.value, // text stored in 'value'
-        };
-    } catch (error) {
+        if (response.data && response.data.text && typeof response.data.text == 'string') {
+            return {
+                id: response.data.id,
+                text: response.data.text, // text stored in 'value' field
+            };
+        }
+        // If the API call succeeds but the data is bad, use the fallback text
+        return { id: 'bad-data', text: 'generation error due to incomplete api response' };
+    } 
+    catch (error) {
         console.error("Error fetching API seed:", error);
-        // Fallback data to continue generation in cases of failure
+        // Fallback data
         return { id: 'fallback', text: 'error loading api data, generation is now based on a default value' };
     }
 };
@@ -24,6 +29,7 @@ const fetchApiSeed = async (): Promise<ApiSeedData> => {
 const generateLimbSegments = (limbCount: number): BoneSegment[] => {
     // Generate two or three segments per limb with random dimensions and angles
     const segmentCount = limbCount === 2 ? 3 : 2; // Two-legged creatures get more segments
+    //todo: third segment sometimes apearing with 2 limbs - fix!
     const segments: BoneSegment[] = [];
 
     for (let i = 0; i < segmentCount; i++) {
@@ -43,7 +49,11 @@ const generateLimbSegments = (limbCount: number): BoneSegment[] => {
 // --- MAPPING FUNCTION ---
 // Map API data to creature parameters
 export const generateCreatureFromApiSeed = (apiData: ApiSeedData): CreatureParameters => {
-    const text = apiData.text.toLowerCase();
+    const seedText = apiData && apiData.text && typeof apiData.text === 'string' 
+        ? apiData.text 
+        : "default seed text for error recovery";
+    
+    const text = seedText.toLowerCase();
     
     // RULE 1: Limb count based on text length
     //todo: build this out for other limb counts
@@ -51,11 +61,11 @@ export const generateCreatureFromApiSeed = (apiData: ApiSeedData): CreatureParam
     
     // RULE 2: Color based on first letter
     //todo: remove?
-    const firstChar = text.charAt(0);
-    let color = DEFAULT_CREATURE.color; // White for bones
-    if (['a', 'b', 'c', 'd'].includes(firstChar)) color = '#5E8B7E'; // Green
-    else if (['e', 'f', 'g', 'h'].includes(firstChar)) color = '#A84C4C'; // Red
-    else if (['i', 'j', 'k', 'l'].includes(firstChar)) color = '#D1B000'; // Yello
+    // const firstChar = text.charAt(0);
+    let color = DEFAULT_CREATURE.color; // Off-white for bones
+    // if (['a', 'b', 'c', 'd'].includes(firstChar)) color = '#5E8B7E'; // Green
+    // else if (['e', 'f', 'g', 'h'].includes(firstChar)) color = '#A84C4C'; // Red
+    // else if (['i', 'j', 'k', 'l'].includes(firstChar)) color = '#D1B000'; // Yello
 
     // RULE 3: Ribs based on word count
     //todo: 
@@ -72,6 +82,7 @@ export const generateCreatureFromApiSeed = (apiData: ApiSeedData): CreatureParam
 
     return {
         name: `The ${text.split(' ')[0]}-${limbCount} Creature`,
+        sentence: text,
         color,
         head: { 
             baseShape, 
@@ -79,9 +90,10 @@ export const generateCreatureFromApiSeed = (apiData: ApiSeedData): CreatureParam
             pointCount: baseShape === 'polygon' ? (wordCount % 4) + 3 : undefined // 3 to 6 sides
         },
         torso: { 
+            //todo: using ribs as spine for now; separate into its own type later
             type: 'ribs', // Simplifying for now
             height: 100, 
-            width: 40, 
+            width: 10, 
             ribSegments 
         },
         limbs: { 

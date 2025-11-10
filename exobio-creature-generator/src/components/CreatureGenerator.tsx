@@ -94,23 +94,24 @@ const CreatureGenerator: React.FC = () => {
 
     // Simplified logic to position limbs (based on count)
     const limbPositions = [
-        { x: -20, y: 0, rot: -100 },  // Front Left
-        { x: 20, y: 0, rot: -80 },    // Front Right
-        { x: -20, y: 70, rot: -80 },  // Back Left (if 4 or 6)
-        { x: 20, y: 70, rot: -100 },  // Back Right (if 4 or 6)
+        { x: 0, y: 0, rot: -100 },  // Top Left
+        { x: 0, y: 0, rot: 100 },    // Top Right
+        { x: 0, y: 70, rot: -80 },  // Bottom Left (if 4 or 6)
+        { x: 0, y: 70, rot: 80 },  // Bottom Right (if 4 or 6)
         // todo: more positions for 6 limbs? Should this be asymmetrical?
     ].slice(0, creature.limbs.count);
 
     return (
         <div style={{ textAlign: 'center', padding: '20px' }}>
             <h2>{creature.name}</h2>
-            <p>Type: {creature.limbs.count}-Limbed Skeleton</p>
+            <p>{creature.limbs.count}-Limbed Skeleton</p>
+            <p>Generation seed sentence: {creature.sentence}</p>
 
             <svg 
                 width="400" 
                 height="400" 
                 viewBox="-200 -150 400 400" 
-                style={{ border: '1px solid #eee', margin: '20px', backgroundColor: '#f9f9f9' }}
+                style={{ border: '2px solid #eee', margin: '20px', backgroundColor: '#ffffffff' }}
             >
                 {/* HEAD (simplified as a circle for now) */}
                 // todo: rework to use baseShape and pointCount for polygons

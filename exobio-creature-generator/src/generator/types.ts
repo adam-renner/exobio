@@ -21,6 +21,7 @@ export interface BoneSegment {
 export interface CreatureParameters {
   color: string;
   name: string;
+  sentence: string; // Seed sentence used for generation
   head: {
     baseShape: 'circle' | 'polygon';
     radius: number;
@@ -40,8 +41,9 @@ export interface CreatureParameters {
 
 // Initial/default state for the component
 export const DEFAULT_CREATURE: CreatureParameters = {
-    color: '#ccc',
+    color: '#ddcab3ff',
     name: 'Placeholder',
+    sentence: 'Placeholder',
     head: { baseShape: 'circle', radius: 20 },
     torso: { type: 'ribs', height: 100, width: 40, ribSegments: 5 },
     limbs: { count: 2, segments: [{ length: 80, thickness: 10, angle: 0 }] }
