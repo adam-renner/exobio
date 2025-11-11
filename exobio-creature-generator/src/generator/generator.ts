@@ -1,28 +1,57 @@
 // generator.ts
-import type { CreatureParameters, BoneSegment, ApiSeedData} from './types';
+import type { CreatureParameters, BoneSegment, ApiSeedData, PolygonPoint, SkullParameters } from './types';
 import {DEFAULT_CREATURE} from './types';
 import axios from 'axios';
 
-// --- API FETCH ---
+// --- API FETCH FUNCTION ---
 const fetchApiSeed = async (): Promise<ApiSeedData> => {
     try {
         // Using a public API for a random fact to seed generation
-        const response = await axios.get('https://uselessfacts.jsph.pl/random.json');
+        const response = await axios.get('https://uselessfacts.jsph.pl/random.json'); 
         // Reformat the response
-        if (response.data && response.data.text && typeof response.data.text == 'string') {
+        if (response.data && response.data.text && typeof response.data.text === 'string') {
             return {
                 id: response.data.id,
-                text: response.data.text, // text stored in 'value' field
+                text: response.data.text, 
             };
         }
         // If the API call succeeds but the data is bad, use the fallback text
         return { id: 'bad-data', text: 'generation error due to incomplete api response' };
-    } 
-    catch (error) {
+
+    } catch (error) {
         console.error("Error fetching API seed:", error);
         // Fallback data
-        return { id: 'fallback', text: 'error loading api data, generation is now based on a default value' };
+        return { id: 'fallback', text: 'api network failure, generation is now based on a default value' };
     }
+};
+
+// --- Generates a set of polygon points for a defined width/height ---
+const generatePolygonPoints = (width: number, height: number, complexity: number, seed: number): PolygonPoint[] => {
+    const points: PolygonPoint[] = [];
+    const numPoints = 4 + (seed % complexity); // 4 to 7 points for complexity
+
+    // Define vertices around the center (0,0) with some randomness
+    for (let i = 0; i < numPoints; i++) {
+        // Use angle to distribute points
+        const angle = (i / numPoints) * Math.PI * 2;
+        // Introduce randomness to the radius
+        const radiusX = width / 2 * (0.8 + Math.random() * 0.4); 
+        const radiusY = height / 2 * (0.8 + Math.random() * 0.4);
+        
+        points.push({
+            x: Math.round(Math.cos(angle) * radiusX),
+            y: Math.round(Math.sin(angle) * radiusY),
+        });
+    }
+    
+    // Sort points to connect in a logical order (clockwise) for proper drawing
+    points.sort((a, b) => {
+        const angleA = Math.atan2(a.y, a.x);
+        const angleB = Math.atan2(b.y, b.x);
+        return angleA - angleB;
+    });
+
+    return points;
 };
 
 // --- LIMB GENERATION LOGIC ---
@@ -49,46 +78,67 @@ const generateLimbSegments = (limbCount: number): BoneSegment[] => {
 // --- MAPPING FUNCTION ---
 // Map API data to creature parameters
 export const generateCreatureFromApiSeed = (apiData: ApiSeedData): CreatureParameters => {
-    const seedText = apiData && apiData.text && typeof apiData.text === 'string' 
-        ? apiData.text 
-        : "default seed text for error recovery";
-    
-    const text = seedText.toLowerCase();
-    
-    // RULE 1: Limb count based on text length
+    const seedText = apiData.text.toLowerCase();
+    const text = seedText && typeof seedText === 'string' ? seedText : "default seed text for error recovery";
+    let color = DEFAULT_CREATURE.color;
+    // Limb count based on text length
     //todo: build this out for other limb counts
     const limbCount = text.length % 2 === 0 ? 4 : 2; // Even length -> Quadruped (4), Odd -> Biped (2)
     
-    // RULE 2: Color based on first letter
-    //todo: remove?
-    // const firstChar = text.charAt(0);
-    let color = DEFAULT_CREATURE.color; // Off-white for bones
-    // if (['a', 'b', 'c', 'd'].includes(firstChar)) color = '#5E8B7E'; // Green
-    // else if (['e', 'f', 'g', 'h'].includes(firstChar)) color = '#A84C4C'; // Red
-    // else if (['i', 'j', 'k', 'l'].includes(firstChar)) color = '#D1B000'; // Yello
-
-    // RULE 3: Ribs based on word count
-    //todo: 
+    // Ribs based on word count
     const wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
-    const ribSegments = (wordCount % 5) + 3; // Range 3 to 7
+    const ribSegments = (wordCount % 5) + 3;
 
-    // RULE 4: Head shape based on a random letter in the middle of text
-    //todo: rework to create more interesting shapes
-    const middleChar = text.charAt(Math.floor(text.length / 2));
-    const baseShape: 'circle' | 'polygon' = ['a', 'e', 'i', 'o', 'u'].includes(middleChar) ? 'circle' : 'polygon';
+    // --- SKULL GENERATION ---
+    const width = 50 + (text.length % 20);
+    const height = 60 + (wordCount % 20);
+    const depth = 40 + (wordCount % 10);
+    const complexitySeed = text.charCodeAt(5) || 5;
 
-    // RULE 5
-    // todo: Add rule for hip/shoulder/girdle structures based on punctuation? 
+    // 1. CRANIUM POINTS
+    const craniumFront = generatePolygonPoints(width, height, 4, complexitySeed);
+    // Side view uses height and depth
+    const craniumSide = generatePolygonPoints(depth, height, 4, complexitySeed + 1);
+
+    // 2. JAW POINTS
+    const jawHeight = 40 + (text.length % 15);
+    const jawWidth = width * 0.7;
+    
+    // Front jaw
+    const jawFront: PolygonPoint[] = [
+        { x: -jawWidth / 2, y: height / 2 - 10 }, 
+        { x: jawWidth / 2, y: height / 2 - 10 }, 
+        { x: jawWidth / 2, y: height / 2 + jawHeight }, 
+        { x: -jawWidth / 2, y: height / 2 + jawHeight }
+    ];
+
+    // Side jaw
+    const jawSide: PolygonPoint[] = [
+        { x: -depth / 2, y: height / 2 - 10 }, // Hinge point (back top)
+        { x: -depth / 2, y: height / 2 + jawHeight * 0.5 }, // Back bottom
+        { x: depth / 2 + jawHeight * 0.5, y: height / 2 + jawHeight * 0.3 }, // Chin point
+        { x: depth / 2, y: height / 2 - 5 } // Front top
+    ];
+
+    const skullParams: SkullParameters = {
+        overallWidth: width, overallHeight: height, overallDepth: depth,
+        craniumPointsFront: craniumFront,
+        craniumPointsSide: craniumSide,
+        eyeCount: 2,
+        eyeSize: 6 + (complexitySeed % 5),
+        eyeDepth: 10 + (complexitySeed % 3),
+        eyeSpacing: width * 0.3,
+        nostrilSize: 3 + (complexitySeed % 2),
+        nostrilYOffset: height * 0.1,
+        jawPointsFront: jawFront,
+        jawPointsSide: jawSide,
+    };
 
     return {
         name: `The ${text.split(' ')[0]}-${limbCount} Creature`,
         sentence: text,
         color,
-        head: { 
-            baseShape, 
-            radius: 20 + (text.length % 10), // some varying size
-            pointCount: baseShape === 'polygon' ? (wordCount % 4) + 3 : undefined // 3 to 6 sides
-        },
+        skull: skullParams,
         torso: { 
             //todo: using ribs as spine for now; separate into its own type later
             type: 'ribs', // Simplifying for now
