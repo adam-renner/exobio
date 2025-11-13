@@ -42,6 +42,7 @@ export interface SkullParameters {
     nostrilYOffset: number; 
     
     // JAWBONE
+    jawWidth: number;
     jawPointsFront: PolygonPoint[];
     jawPointsSide: PolygonPoint[];
 }
@@ -49,7 +50,9 @@ export interface SkullParameters {
 
 // Full parameter set
 export interface CreatureParameters {
-  color: string;
+  strokeColor: string;
+  fillColor: string;
+  holeColor: string;
   name: string;
   sentence: string; // Seed sentence used for generation
   skull: SkullParameters;
@@ -68,7 +71,9 @@ export interface CreatureParameters {
 
 // Initial/default state for the component
 export const DEFAULT_CREATURE: CreatureParameters = {
-    color: '#ddcab3ff',
+    strokeColor: '#ddcab3ff',
+    fillColor: '#f7eadbff',
+    holeColor: '#ac9d8aff',
     name: 'Placeholder',
     sentence: 'Placeholder',
     skull: {
@@ -77,6 +82,7 @@ export const DEFAULT_CREATURE: CreatureParameters = {
         craniumPointsSide: [{x: -30, y: -40}, {x: 30, y: -40}, {x: 30, y: 0}, {x: -30, y: 0}],
         eyeCount: 2, eyeSize: 8, eyeDepth: 5, eyeSpacing: 20,
         nostrilSize: 4, nostrilYOffset: 10,
+        jawWidth: 40,
         jawPointsFront: [{x: -20, y: 0}, {x: 20, y: 0}, {x: 10, y: 40}, {x: -10, y: 40}],
         jawPointsSide: [{x: -20, y: 0}, {x: 20, y: 0}, {x: 10, y: 40}, {x: -10, y: 40}],
     },

@@ -1,60 +1,95 @@
-// CreatureGenerator.tsx
+import '../index.css';
 import React, { useState, useEffect, useCallback } from 'react';
 import type { CreatureParameters, BoneSegment, SkullParameters, PolygonPoint } from '../generator/types';
-import {DEFAULT_CREATURE} from '../generator/types';
+import { DEFAULT_CREATURE } from '../generator/types';
 import { generateNewCreature } from '../generator/generator';
 
-// --- Convert PolygonPoint[] to SVG's required "points" string ---
+
+// --- Helper: Convert PolygonPoint[] to SVG's required string ---
 const pointsToSvgString = (points: PolygonPoint[]): string => {
-    // Example: [{x: 10, y: 20}, {x: 30, y: 40}] -> "10,20 30,40"
+    // ex: [{x: 10, y: 20}, {x: 30, y: 40}] -> "10,20 30,40"
     return points.map(p => `${p.x},${p.y}`).join(' ');
 };
 
 // --- SKULL VIEW COMPONENTS ---
 interface SkullViewProps {
     skullParams: SkullParameters;
-    color: string;
+    strokeColor: string;
+    fillColor: string;
+    holeColor: string;
 }
 
-const SkullFrontView: React.FC<SkullViewProps> = ({ skullParams, color }) => {
-    const { craniumPointsFront, jawPointsFront, eyeSize, eyeSpacing, eyeCount, nostrilSize, nostrilYOffset } = skullParams;
+const SkullFrontView: React.FC<SkullViewProps> = ({ skullParams, strokeColor, fillColor, holeColor }) => {
+    const { craniumPointsFront, jawPointsFront, eyeSize, eyeSpacing, eyeCount, nostrilSize, nostrilYOffset, jawWidth } = skullParams;
 
     const eyeXOffset = eyeSpacing / 2;
+
+    // TEETH LOGIC (hardcoded)
+    //todo: don't love how this looks, need to figure out how to make more realistic
+    const toothCount = 10;
+    const toothSize = 5;
+    const teethYPosition = 40; 
+
+    const toothPoints: PolygonPoint[] = [];
+    const startX = -jawWidth / 2;
+    
+    // Generates pointy teeth pattern
+    for (let i = 0; i <= toothCount; i++) {
+        const x = startX + (i * jawWidth / toothCount);
+        
+        // Bottom edge of jaw
+        toothPoints.push({ x: x, y: teethYPosition }); 
+        
+        // Peak of tooth
+        if (i < toothCount) {
+            toothPoints.push({ x: x + (jawWidth / (toothCount * 2)), y: teethYPosition + toothSize });
+        }
+    };
 
     return (
         <g transform="translate(0, 0)">
             {/* 1. CRANIUM (Front) */}
             <polygon
                 points={pointsToSvgString(craniumPointsFront)}
-                fill="none"
-                stroke={color}
-                strokeWidth={2}
+                fill= {fillColor}
+                stroke={strokeColor}
+                strokeWidth={3}
+                style={{ strokeLinejoin: 'round', strokeLinecap: 'round' }}
             />
 
             {/* 2. JAW (Front) */}
             <polygon
                 points={pointsToSvgString(jawPointsFront)}
-                fill="none"
-                stroke={color}
-                strokeWidth={2}
+                fill={fillColor}
+                stroke={strokeColor}
+                strokeWidth={3}
+                style={{ strokeLinejoin: 'round', strokeLinecap: 'round' }}
             />
 
-            {/* 3. EYE SOCKETS (Front - centered on 0,0) */}
+            {/* 3. EYE SOCKETS (Front - centered) */}
             {eyeCount === 2 && (
                 <>
-                    <circle cx={-eyeXOffset} cy={-10} r={eyeSize} fill="black" /> 
-                    <circle cx={eyeXOffset} cy={-10} r={eyeSize} fill="black" />
+                    <circle cx={-eyeXOffset} cy={-10} r={eyeSize} fill={holeColor}/> 
+                    <circle cx={eyeXOffset} cy={-10} r={eyeSize} fill={holeColor} />
                 </>
             )}
-            {eyeCount === 1 && <circle cx={0} cy={-10} r={eyeSize * 1.5} fill="black" />}
+            {eyeCount === 1 && <circle cx={0} cy={-10} r={eyeSize * 1.5} fill={holeColor} />}
 
             {/* 4. NOSTRIL (Front) */}
-            <circle cx={0} cy={nostrilYOffset} r={nostrilSize} fill="black" />
+            <circle cx={0} cy={nostrilYOffset} r={nostrilSize} fill={holeColor} />
+
+            { /*5. TEETH (Front) */}
+            <polyline
+            points={pointsToSvgString(toothPoints)}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth={1.5}
+            />
         </g>
     );
 };
 
-const SkullSideView: React.FC<SkullViewProps> = ({ skullParams, color }) => {
+const SkullSideView: React.FC<SkullViewProps> = ({ skullParams, strokeColor, fillColor, holeColor }) => {
     const { craniumPointsSide, jawPointsSide, eyeSize, nostrilSize, nostrilYOffset, overallDepth } = skullParams;
 
     return (
@@ -62,17 +97,19 @@ const SkullSideView: React.FC<SkullViewProps> = ({ skullParams, color }) => {
             {/* 1. CRANIUM (Side) */}
             <polygon
                 points={pointsToSvgString(craniumPointsSide)}
-                fill="none"
-                stroke={color}
-                strokeWidth={2}
+                fill={fillColor}
+                stroke={strokeColor}
+                strokeWidth={3}
+                style={{ strokeLinejoin: 'round', strokeLinecap: 'round' }}
             />
 
             {/* 2. JAW (Side) */}
             <polygon
                 points={pointsToSvgString(jawPointsSide)}
-                fill="none"
-                stroke={color}
-                strokeWidth={2}
+                fill={fillColor}
+                stroke={strokeColor}
+                strokeWidth={3}
+                style={{ strokeLinejoin: 'round', strokeLinecap: 'round' }}
             />
             
             {/* 3. EYE SOCKET (Side - centered toward the front) */}
@@ -80,11 +117,11 @@ const SkullSideView: React.FC<SkullViewProps> = ({ skullParams, color }) => {
                 cx={overallDepth * 0.2} // X-position in profile
                 cy={-10} 
                 r={eyeSize} 
-                fill="black" 
+                fill={holeColor}
             /> 
             
-            {/* 4. NOSTRIL (Side) */}
-            <circle cx={overallDepth * 0.3} cy={nostrilYOffset} r={nostrilSize} fill="black" />
+            {/* 4. NOSTRIL (Side - offset like eyes) */}
+            <circle cx={overallDepth * 0.3} cy={nostrilYOffset} r={nostrilSize} fill={holeColor} />
         </g>
     );
 };
@@ -92,13 +129,10 @@ const SkullSideView: React.FC<SkullViewProps> = ({ skullParams, color }) => {
 
 interface BoneProps {
     segment: BoneSegment;
-    color: string;
+    strokeColor: string;
 }
 
-// Draws a single bone segment using a rectangle
-//todo: how to make more bone-like?
-const BoneSegmentComponent: React.FC<BoneProps> = ({ segment, color }) => {
-    // Draws the rectangle centered on its X-axis for easier rotation and connection
+const BoneSegmentComponent: React.FC<BoneProps> = ({ segment, strokeColor }) => {
     const xOffset = -segment.thickness / 2;
     return (
         <rect 
@@ -106,42 +140,45 @@ const BoneSegmentComponent: React.FC<BoneProps> = ({ segment, color }) => {
             y={0} 
             width={segment.thickness} 
             height={segment.length} 
-            fill={color} 
-            rx={segment.thickness / 2} // Rounds corners of rectangle
+            stroke={strokeColor}
+            fill = "none"
+            strokeWidth={2}
+            rx={segment.thickness / 2}
         />
     );
 };
 
 interface LimbProps {
     segments: BoneSegment[];
-    color: string;
-    // Initial position of the limb attachment point (ex: shoulder/hip)
-    //todo: rename? Rework to use with hip/shoulder structures later?
+    strokeColor: string;
     startX: number;
     startY: number; 
-    // Initial rotation of the limb
     initialRotation: number;
 }
 
-// Assembles a multi-segment limb with joints
-const LimbComponent: React.FC<LimbProps> = ({ segments, color, startX, startY, initialRotation }) => {
+// Updated to use L-systems
+const LimbComponent: React.FC<LimbProps> = ({ segments, strokeColor, startX, startY, initialRotation }) => {
     let cumulativeRotation = initialRotation;
     
-    // Draws limbs recursively, translating and rotating each segment
     return (
         <g transform={`translate(${startX}, ${startY})`}>
             {segments.map((segment, index) => {
                 const rotation = cumulativeRotation + segment.angle;
-                // Update rotation for the next joint
-                //todo: Does the rotation need to be limited for realism?
                 cumulativeRotation = rotation;
 
+                // Each segment moves from its own start point
+                // Segment.length used as the Y-translation only if this is not the first segment
+                //todo: update, this is looking wild
+                const prevSegmentLength = index > 0 ? segments[index - 1].length : 0;
+                
                 return (
                     <g 
                         key={index} 
-                        transform={`rotate(${rotation}) translate(0, ${index > 0 ? segment.length : 0})`}
+                        // Should transform based on the end of the previous segment
+                        //  todo: debug
+                        transform={`rotate(${rotation}) translate(0, ${prevSegmentLength})`}
                     >
-                        <BoneSegmentComponent segment={segment} color={color} />
+                        <BoneSegmentComponent segment={segment} strokeColor={strokeColor} />
                     </g>
                 );
             })}
@@ -151,29 +188,29 @@ const LimbComponent: React.FC<LimbProps> = ({ segments, color, startX, startY, i
 
 interface TorsoProps {
     torso: CreatureParameters['torso'];
-    color: string;
+    strokeColor: string;
     isSideView: boolean;
 }
 
-const TorsoComponent: React.FC<TorsoProps> = ({ torso, color, isSideView }) => {
-    const viewWidth = isSideView ? torso.height * 0.5 : torso.width; // Side view is narrower (depth)
+const TorsoComponent: React.FC<TorsoProps> = ({ torso, strokeColor, isSideView }) => {
+    const viewWidth = isSideView ? torso.height * 0.5 : torso.width;
     const viewHeight = torso.height;
 
-    // Center point (assuming the origin (0,0) is the center of the viewport)
     return (
         <g>
-            {/* Main Spine/Rib Cage (Simplified Polygon/Rect) */}
+            {/* Spine/Rib cage
+            todo: fix this... */}
             <rect 
                 x={-viewWidth / 2} 
                 y={0} 
                 width={viewWidth} 
                 height={viewHeight} 
                 fill="none" 
-                stroke={color}
+                stroke={strokeColor}
                 strokeWidth={2}
                 rx={5}
             />
-            {/* Simple representation of ribs/segments */}
+            {/* Ribs/segments */}
             {Array.from({ length: torso.ribSegments }).map((_, i) => (
                  <line
                     key={i}
@@ -181,8 +218,8 @@ const TorsoComponent: React.FC<TorsoProps> = ({ torso, color, isSideView }) => {
                     y1={(i + 1) * (viewHeight / (torso.ribSegments + 1))}
                     x2={viewWidth / 2}
                     y2={(i + 1) * (viewHeight / (torso.ribSegments + 1))}
-                    stroke={color}
-                    strokeWidth={1}
+                    stroke={strokeColor}
+                    strokeWidth={2}
                 />
             ))}
         </g>
@@ -202,8 +239,6 @@ const CreatureGenerator: React.FC = () => {
             setCreature(newCreature);
         } catch (error) {
             console.error("Failed to generate creature:", error);
-            // On error, revert to a default state or show an error message
-            //todo: improve error handling...
             setCreature({...DEFAULT_CREATURE, name: "Generation Failed"});
         } finally {
             setIsLoading(false);
@@ -214,100 +249,113 @@ const CreatureGenerator: React.FC = () => {
         generate();
     }, [generate]);
 
-    // Simplified logic to position limbs (based on count)
-    const limbPositions = [
-        { x: 0, y: 0, rot: -100 },  // Top Left
-        { x: 0, y: 0, rot: 100 },    // Top Right
-        { x: 0, y: 70, rot: -80 },  // Bottom Left (if 4 or 6)
-        { x: 0, y: 70, rot: 80 },  // Bottom Right (if 4 or 6)
-        // todo: more positions for 6 limbs? Should this be asymmetrical?
-    ].slice(0, creature.limbs.count);
-
-    // Calculate the total height of the skull and torso for accurate vertical alignment
-    // Assuming Skull is 100 units high (for the viewBox context)
+    // Calculate Y-offset to put the torso below the skull
     const SKULL_VIEWBOX_HEIGHT = 100;
-    
-    // Y-offset to place the torso below the skull
     const TORSO_Y_OFFSET = SKULL_VIEWBOX_HEIGHT * 0.5; 
 
+    // Dynamic limb positions attached to the torso based on its width/height
+    //todo: debug, positions aren't consistant or "connecting" well
+    const limbPositions = [
+        // Upper Limbs - attached at Y=0.15 of torso height
+        { x: -creature.torso.width / 2, y: creature.torso.height * 0.15, rot: -100 }, 
+        { x: creature.torso.width / 2, y: creature.torso.height * 0.15, rot: 100 }, 
+        // Lower Limbs - attached at Y=0.85 of torso height
+        { x: -creature.torso.width / 2, y: creature.torso.height * 0.85, rot: -80 }, 
+        { x: creature.torso.width / 2, y: creature.torso.height * 0.85, rot: 80 }, 
+    ].slice(0, creature.limbs.count);
+
+    //BIG TODO: layout isn't working!!! May need to reinstall modules
     return (
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-            <h2>{creature.name}</h2>
-            <p>Type: {creature.limbs.count}-Limbed Skeleton</p>
+        <div className="p-5 flex flex-col items-center min-h-screen bg-gray-100 font-inter">
+            <div className="bg-white p-6 rounded-xl shadow-xl **w-full mx-auto**">
+                <h1 className="text-3xl font-bold mb-2 text-gray-800">{creature.name}</h1>
+                <p className="text-gray-500 mb-4">Type: {creature.limbs.count}-Limbed Skeleton | Rib Segments: {creature.torso.ribSegments}</p>
 
-            <button onClick={generate} disabled={isLoading} style={{ padding: '10px 20px', marginBottom: '20px' }}>
-                {isLoading ? 'Generating...' : 'Generate Weird Skeleton'}
-            </button>
+                <button 
+                    onClick={generate} 
+                    disabled={isLoading} 
+                    className="px-6 py-2 mb-6 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 transition duration-300 disabled:opacity-50"
+                >
+                    {isLoading ? 'Generating...' : 'Generate Weird Skeleton'}
+                </button>
 
-            <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-                {/* FRONT VIEW CONTAINER */}
-                <div style={{ border: '1px solid #eee', width: '45%' }}>
-                    <h3>Front View</h3>
-                    <svg width="250" height="400" viewBox="-100 -100 200 400"> {/* INCREASED VIEWBOX HEIGHT */}
-                        
-                        {/* 1. SKULL (Centered at Y=-50 for space) */}
-                        <g transform="translate(0, -50)">
-                            <SkullFrontView skullParams={creature.skull} color={creature.color} />
-                        </g>
+                <div className="grid grid-cols-3 gap-6">
 
-                        {/* 2. TORSO (Starts around Y=100) */}
-                        <g transform={`translate(0, ${TORSO_Y_OFFSET})`}>
-                            <TorsoComponent torso={creature.torso} color={creature.color} isSideView={false} />
+                    {/* 1. FRONT VIEW CONTAINER (Column 1) */}
+                    <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                        <h3 className="text-xl font-semibold mb-2">Front View</h3>
+                        <svg width="100%" height="400" viewBox="-100 -100 200 400" className="bg-white rounded-md shadow-inner"> 
+                            
+                            {/* 1. SKULL */}
+                            <g transform="translate(0, -50)">
+                                <SkullFrontView skullParams={creature.skull} strokeColor={creature.strokeColor} fillColor={creature.fillColor} holeColor={creature.holeColor} />
+                            </g>
 
-                            {/* 3. LIMBS (Attached to Torso) */}
-                            {limbPositions.map((pos, index) => (
-                                <LimbComponent 
-                                    key={index}
-                                    segments={creature.limbs.segments} 
-                                    color={creature.color}
-                                    startX={pos.x} 
-                                    startY={pos.y}
-                                    initialRotation={pos.rot}
-                                />
-                            ))}
-                        </g>
+                            {/* 2. TORSO */}
+                            <g transform={`translate(0, ${TORSO_Y_OFFSET})`}>
+                                <TorsoComponent torso={creature.torso} strokeColor={creature.strokeColor} isSideView={false} />
 
-                    </svg>
-                </div>
-
-                {/* SIDE VIEW CONTAINER */}
-                <div style={{ border: '1px solid #eee', width: '45%' }}>
-                    <h3>Side View</h3>
-                    <svg width="250" height="400" viewBox="-100 -100 200 400"> {/* INCREASED VIEWBOX HEIGHT */}
-
-                        {/* 1. SKULL (Centered at Y=-50) */}
-                         <g transform="translate(0, -50)">
-                            <SkullSideView skullParams={creature.skull} color={creature.color} />
-                        </g>
-
-                        {/* 2. TORSO (Starts around Y=100) */}
-                        <g transform={`translate(0, ${TORSO_Y_OFFSET})`}>
-                            {/* Side view is visually narrower */}
-                            <TorsoComponent torso={creature.torso} color={creature.color} isSideView={true} />
-
-                            {/* 3. LIMBS (Side view typically only shows two limbs) */}
-                            {creature.limbs.count > 0 && (
-                                <>
-                                    {/* Simplified limb rendering for the side view, showing one upper and one lower limb */}
+                                {/* 3. LIMBS */}
+                                {limbPositions.map((pos, index) => (
                                     <LimbComponent 
+                                        key={index}
                                         segments={creature.limbs.segments} 
-                                        color={creature.color}
-                                        startX={creature.torso.width * 0.1} // Offset slightly from center
-                                        startY={creature.torso.height * 0.15} // Shoulder
-                                        initialRotation={-90}
+                                        strokeColor={creature.strokeColor}
+                                        startX={pos.x} 
+                                        startY={pos.y}
+                                        initialRotation={pos.rot}
                                     />
-                                     <LimbComponent 
-                                        segments={creature.limbs.segments} 
-                                        color={creature.color}
-                                        startX={creature.torso.width * 0.1}
-                                        startY={creature.torso.height * 0.85} // Hip
-                                        initialRotation={-80}
-                                    />
-                                </>
-                            )}
-                        </g>
+                                ))}
+                            </g>
+                        </svg>
+                    </div>
 
-                    </svg>
+                    {/* 2. SIDE VIEW CONTAINER (Column 2) */}
+                    <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                        <h3 className="text-xl font-semibold mb-2">Side View</h3>
+                        <svg width="100%" height="400" viewBox="-100 -100 200 400" className="bg-white rounded-md shadow-inner">
+
+                            {/* 1. SKULL */}
+                            <g transform="translate(0, -50)">
+                                <SkullSideView skullParams={creature.skull} strokeColor={creature.strokeColor} fillColor={creature.fillColor} holeColor={creature.holeColor} />
+                            </g>
+
+                            {/* 2. TORSO */}
+                            <g transform={`translate(0, ${TORSO_Y_OFFSET})`}>
+                                <TorsoComponent torso={creature.torso} strokeColor={creature.strokeColor} isSideView={true} />
+
+                                {/* 3. LIMBS - Only showing one set due to profile view */}
+                                {creature.limbs.count > 0 && (
+                                    <>
+                                        {/* Upper limb */}
+                                        <LimbComponent 
+                                            segments={creature.limbs.segments} 
+                                            strokeColor={creature.strokeColor}
+                                            startX={creature.torso.width * 0.1} 
+                                            startY={creature.torso.height * 0.15} 
+                                            initialRotation={-90}
+                                        />
+                                        {/* Lower limb */}
+                                        <LimbComponent 
+                                            segments={creature.limbs.segments} 
+                                            strokeColor={creature.strokeColor}
+                                            startX={creature.torso.width * 0.1}
+                                            startY={creature.torso.height * 0.85} 
+                                            initialRotation={-80}
+                                        />
+                                    </>
+                                )}
+                            </g>
+                        </svg>
+                    </div>
+                
+                    {/* 3. DEBUGGING/TROUBLESHOOTING DATA (Column 3) */}
+                    <div className="border border-gray-300 rounded-lg p-4 bg-gray-50 text-left">
+                        <h3 className="text-xl font-semibold mb-2 text-gray-700">Generation Data</h3>
+                        <div className="bg-gray-800 text-green-400 p-4 rounded-lg overflow-y-scroll h-[300px] lg:h-[400px]">
+                        <pre className="text-xs whitespace-pre-wrap break-words">{JSON.stringify(creature, null, 2)}</pre>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -315,4 +363,3 @@ const CreatureGenerator: React.FC = () => {
 };
 
 export default CreatureGenerator;
-// Remember: render <CreatureGenerator /> in App.tsx!
